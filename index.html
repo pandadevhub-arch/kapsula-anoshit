@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>שפת הנשמה</title>
 <link rel="icon" href="assets/logo.png">
+<!-- התקנה כאפליקציה (PWA) — מחשב ונייד -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#41372C">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="שפת הנשמה">
+<link rel="apple-touch-icon" href="assets/icon-maskable-192.png">
 <script src="logo-data.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -342,6 +350,10 @@
   <!-- ===== הגדרות ===== -->
   <section class="tab" id="tab-settings">
     <div class="section-head"><h2 class="section">הגדרות</h2><p class="lead">פעם אחת. אחר כך אף פעם לא יוצאים מהמערכת.</p></div>
+    <div class="card" id="installCard"><h3>📲 התקנת המערכת כאפליקציה</h3>
+      <p class="hint" style="margin-bottom:12px">מתקינים פעם אחת — והמערכת נפתחת כאפליקציה אמיתית עם אייקון משלה, במסך מלא, בלי שורת כתובת. עובד במחשב (Windows · Linux · Mac) ובנייד (iPhone · Android).</p>
+      <div class="actions"><button class="btn dark" id="installBtn">📲 התקנת האפליקציה</button></div>
+      <div class="hint" id="installHint" style="margin-top:10px"></div></div>
     <div class="card"><h3>מנוע הבינה</h3>
       <p class="hint" id="keyHint">אם פרסת את המערכת ל‑Vercel והגדרת שם את המפתח — לא צריך כלום כאן. אם את מריצה מקומית — הזיני מפתח (נשמר רק אצלך במחשב).</p>
       <label class="lbl">מפתח API (לשימוש מקומי)</label>
@@ -1229,6 +1241,60 @@ try{if(window.speechSynthesis){speechSynthesis.getVoices();speechSynthesis.addEv
 document.head.insertAdjacentHTML('beforeend','<style>'+SLIDE_CSS+'</style>');
 initChat();
 try{const _a=document.querySelector('nav button.active');if(_a)_a.scrollIntoView({inline:'center',block:'nearest'});}catch(e){}
+
+// ===== PWA — התקנה כאפליקציה (מחשב + נייד) =====
+(function(){
+  // רישום Service Worker (נדרש להתקנה; עובד רק ב-https או localhost, לא ב-file://)
+  if('serviceWorker' in navigator && location.protocol !== 'file:'){
+    window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});
+  }
+  const btn=document.getElementById('installBtn');
+  const hint=document.getElementById('installHint');
+  const isStandalone=()=>window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
+  const ua=navigator.userAgent||'';
+  const isIOS=/iphone|ipad|ipod/i.test(ua)||(/Macintosh/.test(ua)&&'ontouchend'in document);
+  let deferred=null;
+
+  function setHint(html){if(hint)hint.innerHTML=html;}
+
+  // אם כבר מותקנת
+  if(isStandalone()){
+    if(btn){btn.textContent='✓ המערכת מותקנת';btn.disabled=true;}
+    setHint('<span style="color:var(--green)">המערכת כבר רצה כאפליקציה מותקנת 🌿</span>');
+  } else if(isIOS){
+    // ב-iPhone/iPad אין כפתור אוטומטי — מנחים ידנית
+    if(btn)btn.textContent='📲 איך מתקינים באייפון';
+    setHint('באייפון/אייפד: פתחי ב-<b>Safari</b> ← לחצי על כפתור <b>שיתוף</b> (ריבוע עם חץ למעלה) ← <b>הוסף למסך הבית</b> (Add to Home Screen).');
+  } else if(location.protocol==='file:'){
+    setHint('כדי להתקין כאפליקציה צריך לפתוח את המערכת מכתובת אינטרנט (לאחר פריסה ל-Vercel) או משרת מקומי — לא מקובץ ישירות.');
+  } else {
+    setHint('לחצי על הכפתור כדי להתקין. אם הכפתור לא פעיל עדיין — רענני את הדף פעם אחת, או השתמשי בתפריט הדפדפן ← "התקן אפליקציה".');
+  }
+
+  // Chrome/Edge/Android — אירוע ההתקנה הרשמי
+  window.addEventListener('beforeinstallprompt',(e)=>{
+    e.preventDefault();deferred=e;
+    if(btn){btn.disabled=false;btn.textContent='📲 התקנת האפליקציה';}
+    setHint('המערכת מוכנה להתקנה — לחצי "התקנת האפליקציה" 🌿');
+  });
+
+  if(btn){btn.onclick=async()=>{
+    if(deferred){
+      deferred.prompt();
+      try{const c=await deferred.userChoice;if(c&&c.outcome==='accepted'){setHint('<span style="color:var(--green)">מותקנת ✓ — חפשי את האייקון של "שפת הנשמה".</span>');}else{setHint('ההתקנה בוטלה. אפשר תמיד שוב מההגדרות.');}}catch(_){}
+      deferred=null;return;
+    }
+    if(isIOS){setHint('באייפון/אייפד: <b>Safari</b> ← <b>שיתוף</b> ← <b>הוסף למסך הבית</b>.');return;}
+    if(isStandalone()){toast('המערכת כבר מותקנת ✓','good');return;}
+    setHint('פתחי את תפריט הדפדפן (⋮ בפינה) ← <b>"התקן אפליקציה" / Install</b>. אם אין — רענני את הדף פעם אחת ונסי שוב.');
+  };}
+
+  window.addEventListener('appinstalled',()=>{
+    deferred=null;toast('שפת הנשמה הותקנה כאפליקציה 🌿','good');
+    if(btn){btn.textContent='✓ המערכת מותקנת';btn.disabled=true;}
+    setHint('<span style="color:var(--green)">מותקנת ✓</span>');
+  });
+})();
 </script>
 </body>
 </html>
